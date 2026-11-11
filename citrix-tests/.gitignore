@@ -1,0 +1,10 @@
+spanclient
+grabclient
+ls/panel
+ls/ls.[ch]
+ls/xdg*
+vk/vkey
+vk/vk.[ch]
+*.ppm
+*.out
+bindfired
