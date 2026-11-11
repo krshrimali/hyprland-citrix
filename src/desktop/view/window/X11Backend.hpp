@@ -84,6 +84,7 @@ namespace Desktop::View {
             CHyprSignalListener setGeometry;
             CHyprSignalListener activate;
             CHyprSignalListener pong;
+            CHyprSignalListener fullscreenMonitors;
         } m_listeners;
     };
 }

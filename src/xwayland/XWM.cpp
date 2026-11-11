@@ -502,11 +502,7 @@ void CXWM::handleClientMessage(xcb_client_message_event_t* e) {
             LOG(Log::DEBUG, "[xwm] surface {:x} requests fullscreen monitors [{} {} {} {}] -> {}x{} at {},{}", rc<uintptr_t>(XSURF.get()), INDICES[0], INDICES[1], INDICES[2],
                 INDICES[3], XSURF->m_fullscreenMonitorsBox->w, XSURF->m_fullscreenMonitorsBox->h, XSURF->m_fullscreenMonitorsBox->x, XSURF->m_fullscreenMonitorsBox->y);
 
-        // re-apply fullscreen so the new span takes effect
-        if (XSURF->m_fullscreen && XSURF->m_mapped) {
-            XSURF->m_state.requestsFullscreen = true;
-            XSURF->m_events.stateChanged.emit();
-        }
+        XSURF->m_events.fullscreenMonitorsChanged.emit();
     } else if (e->type == HYPRATOMS["_NET_ACTIVE_WINDOW"]) {
         XSURF->m_events.activate.emit();
     } else if (e->type == HYPRATOMS["XdndStatus"]) {

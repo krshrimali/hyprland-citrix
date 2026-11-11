@@ -33,6 +33,14 @@ for p in "200 100" "2700 600" "4500 400"; do set -- $p; H eval "hl.dispatch(hl.d
   t=$(H activewindow -j | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("title"))'); ok "$([ "$t" = spanclient ] && echo 1)" "P3 pointer over panel area ($1,$2) focuses span window ($t)"; done
 pkill -f "$T/spanclient"; sleep 2
 for m in A C; do set -- $(band $m); ok "$([ "$1" -ge 90 ] && echo 1)" "panel restored on $m after span ends (blue=$1%)"; done
+# extend while already fullscreen on one monitor (toolbar "extend to all displays")
+for m in A B C; do (WAYLAND_DISPLAY=wayland-2 timeout 40 $T/ls/panel $m >/dev/null 2>&1 &); done; sleep 1
+H eval 'hl.dispatch(hl.dsp.focus({monitor="B"}))' >/dev/null
+(DISPLAY=$ND timeout 30 $T/spanclient 1 1 1 3 late > $T/span_late.out 2>&1 &); sleep 6
+ok "$(grep -q 'final 5080x2560+0+0' $T/span_late.out && echo 1)" "extend from single-monitor fullscreen spans 5080x2560+0+0"
+for m in A C; do set -- $(band $m); ok "$([ "$2" -ge 90 ] && echo 1)" "extend: span drawn above panel on $m (red=$2%)"; done
+ok "$(DISPLAY=$ND xprop -root _NET_ACTIVE_WINDOW >/dev/null && [ "$(grep -c configure $T/span_late.out)" -ge 1 ] && echo 1)" "extend: client received configure"
+pkill -f "$T/spanclient"; pkill -f "$T/ls/panel"; sleep 2
 # P4 keyboard grab
 rm -f $T/bindfired; WAYLAND_DISPLAY=wayland-2 $T/vk/vkey; sleep 1; ok "$([ -f $T/bindfired ] && echo 1)" "P4 bind fires with no grab"; rm -f $T/bindfired
 (DISPLAY=$ND $T/grabclient >/dev/null 2>&1 &); sleep 3.5; WAYLAND_DISPLAY=wayland-2 $T/vk/vkey; sleep 1; ok "$([ ! -f $T/bindfired ] && echo 1)" "P4 bind suppressed during X keyboard grab"; rm -f $T/bindfired

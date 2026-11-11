@@ -12,6 +12,7 @@
 #include "../../../protocols/core/Compositor.hpp"
 #include "../../../xwayland/XSurface.hpp"
 #include "../../state/WindowState.hpp"
+#include "../../../managers/fullscreen/FullscreenController.hpp"
 
 #ifndef NO_XWAYLAND
 #include "../../../xwayland/XWayland.hpp"
@@ -149,7 +150,7 @@ CX11Backend::CX11Backend(SP<CXWaylandSurface> surface) : m_xwaylandSurface(surfa
     updateMetadata(false);
     updateTraits(false);
 
-    m_listeners.map            = surface->m_events.map.listen([this] {
+    m_listeners.map                = surface->m_events.map.listen([this] {
         m_mapped = true;
         updateSurface(true);
         updateGeometry(true);
@@ -157,11 +158,11 @@ CX11Backend::CX11Backend(SP<CXWaylandSurface> surface) : m_xwaylandSurface(surfa
         updateTraits(true);
         m_events.map.emit();
     });
-    m_listeners.unmap          = surface->m_events.unmap.listen([this] {
+    m_listeners.unmap              = surface->m_events.unmap.listen([this] {
         m_mapped = false;
         m_events.unmap.emit();
     });
-    m_listeners.commit         = surface->m_events.commit.listen([this] {
+    m_listeners.commit             = surface->m_events.commit.listen([this] {
         if (m_pendingReportedSize)
             m_reportedSize = *m_pendingReportedSize;
 
@@ -170,7 +171,7 @@ CX11Backend::CX11Backend(SP<CXWaylandSurface> surface) : m_xwaylandSurface(surfa
         updateTraits(true);
         m_events.commit.emit(false);
     });
-    m_listeners.destroy        = surface->m_events.destroy.listen([this] {
+    m_listeners.destroy            = surface->m_events.destroy.listen([this] {
         updateGeometry(false);
         updateMetadata(false);
         updateTraits(false);
@@ -180,12 +181,23 @@ CX11Backend::CX11Backend(SP<CXWaylandSurface> surface) : m_xwaylandSurface(surfa
         m_listeners = {};
         m_events.destroy.emit();
     });
-    m_listeners.resourceChange = surface->m_events.resourceChange.listen([this] {
+    m_listeners.resourceChange     = surface->m_events.resourceChange.listen([this] {
         updateSurface(true);
         updateMetadata(true);
         updateTraits(true);
     });
-    m_listeners.state          = surface->m_events.stateChanged.listen([this] {
+    m_listeners.fullscreenMonitors = surface->m_events.fullscreenMonitorsChanged.listen([this] {
+        // The span can change while the window is already fullscreen (e.g. "extend to all displays"
+        // from a single-monitor fullscreen). Re-enter fullscreen so geometry and covered monitors update.
+        const auto WINDOW = m_window.lock();
+        if (!WINDOW || !m_mapped || !Fullscreen::controller()->isFullscreen(WINDOW, Fullscreen::FSMODE_FULLSCREEN))
+            return;
+
+        // only cycle the internal mode: the client keeps seeing fullscreen, so it gets no spurious unfullscreen
+        Fullscreen::controller()->setFullscreenMode(WINDOW, Fullscreen::FSMODE_NONE, Fullscreen::FSMODE_FULLSCREEN);
+        Fullscreen::controller()->setFullscreenMode(WINDOW, Fullscreen::FSMODE_FULLSCREEN, Fullscreen::FSMODE_FULLSCREEN);
+    });
+    m_listeners.state              = surface->m_events.stateChanged.listen([this] {
         const auto SURFACE = m_xwaylandSurface.lock();
         if (!SURFACE)
             return;
@@ -203,7 +215,7 @@ CX11Backend::CX11Backend(SP<CXWaylandSurface> surface) : m_xwaylandSurface(surfa
         updateTraits(true);
         m_events.stateRequest.emit(REQUEST);
     });
-    m_listeners.metadata       = surface->m_events.metadataChanged.listen([this] {
+    m_listeners.metadata           = surface->m_events.metadataChanged.listen([this] {
         updateMetadata(true);
         updateTraits(true);
     });

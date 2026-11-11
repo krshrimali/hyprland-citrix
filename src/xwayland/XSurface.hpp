@@ -60,6 +60,7 @@ class CXWaylandSurface {
         CSignalT<>     pong;
 
         CSignalT<>     activate;
+        CSignalT<>     fullscreenMonitorsChanged; // _NET_WM_FULLSCREEN_MONITORS updated
     } m_events;
 
     struct {
