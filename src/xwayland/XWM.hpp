@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <optional>
+
 #include "XDataSource.hpp"
 #include "Dnd.hpp"
 #include "../helpers/memory/Memory.hpp"
@@ -133,6 +136,7 @@ class CXWM {
     void                 onNewResource(SP<CXWaylandSurfaceResource> resource);
 
     void                 setActiveWindow(xcb_window_t window);
+    std::optional<CBox>  fullscreenMonitorsBox(const std::array<uint32_t, 4>& indices);
     void                 sendState(SP<CXWaylandSurface> surf);
     void                 focusWindow(SP<CXWaylandSurface> surf);
     void                 activateSurface(SP<CXWaylandSurface> surf, bool activate);

@@ -651,6 +651,9 @@ std::vector<SP<IValue>> Values::getConfigValues() {
         MS<Bool>("xwayland:enabled", "allow running applications using X11", true),
         MS<Bool>("xwayland:use_nearest_neighbor", "uses the nearest neighbor filtering for xwayland apps, making them pixelated rather than blurry", true),
         MS<Bool>("xwayland:force_zero_scaling", "forces a scale of 1 on xwayland windows on scaled displays.", false),
+        MS<Bool>("xwayland:real_layout", "expose the real monitor layout to xwayland instead of a horizontal strip. Only applies when all monitors use scale 1.", false),
+        MS<Bool>("xwayland:fullscreen_monitors",
+                 "support _NET_WM_FULLSCREEN_MONITORS, letting X11 apps span a fullscreen window over multiple monitors. Requires restarting xwayland.", false),
         MS<Bool>("xwayland:create_abstract_socket", "Create the abstract Unix domain socket for XWayland", false),
 
         /*

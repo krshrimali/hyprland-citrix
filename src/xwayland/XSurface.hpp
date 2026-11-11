@@ -72,19 +72,21 @@ class CXWaylandSurface {
         std::optional<bool> requestsMinimize;
     } m_state;
 
-    uint32_t                          m_xID         = 0;
-    uint64_t                          m_wlID        = 0;
-    uint64_t                          m_wlSerial    = 0;
-    uint32_t                          m_lastPingSeq = 0;
-    pid_t                             m_pid         = 0;
-    CBox                              m_geometry;
-    bool                              m_overrideRedirect = false;
-    bool                              m_withdrawn        = false;
-    bool                              m_fullscreen       = false;
-    bool                              m_maximized        = false;
-    bool                              m_minimized        = false;
-    bool                              m_mapped           = false;
-    bool                              m_modal            = false;
+    uint32_t m_xID         = 0;
+    uint64_t m_wlID        = 0;
+    uint64_t m_wlSerial    = 0;
+    uint32_t m_lastPingSeq = 0;
+    pid_t    m_pid         = 0;
+    CBox     m_geometry;
+    bool     m_overrideRedirect = false;
+    bool     m_withdrawn        = false;
+    bool     m_fullscreen       = false;
+    bool     m_maximized        = false;
+    bool     m_minimized        = false;
+    bool     m_mapped           = false;
+    bool     m_modal            = false;
+    // _NET_WM_FULLSCREEN_MONITORS span, in xwayland coordinates
+    std::optional<CBox>               m_fullscreenMonitorsBox;
 
     WP<CXWaylandSurface>              m_parent;
     WP<CXWaylandSurface>              m_self;

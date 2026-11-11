@@ -13,7 +13,7 @@ UP<CMonitorPositionController>& State::monitorPositionController() {
     return p;
 }
 
-void CMonitorPositionController::arrange(std::span<const SP<Monitor::IMonitorArrangeable>> monitors, bool xwaylandForceZeroScaling) const {
+void CMonitorPositionController::arrange(std::span<const SP<Monitor::IMonitorArrangeable>> monitors, bool xwaylandForceZeroScaling, bool xwaylandRealLayout) const {
     std::vector<SP<Monitor::IMonitorArrangeable>> toArrange(monitors.begin(), monitors.end());
     std::vector<SP<Monitor::IMonitorArrangeable>> arranged;
     arranged.reserve(toArrange.size());
@@ -99,6 +99,28 @@ void CMonitorPositionController::arrange(std::span<const SP<Monitor::IMonitorArr
         LOG(Log::DEBUG, "arrangeMonitors: {} auto {:j}", m->name(), m->position());
         arranged.emplace_back(m);
     }
+
+    // Real layout: xwayland coords are the layout coords shifted to be non-negative.
+    // Only valid when every monitor is unscaled, as xwayland works in buffer pixels.
+    const bool ALL_UNSCALED = std::ranges::all_of(monitors, [](const auto& m) { return m->scale() == 1.F; });
+    if (xwaylandRealLayout && ALL_UNSCALED && !monitors.empty()) {
+        Vector2D minPos = monitors.front()->position();
+        for (auto const& m : monitors) {
+            minPos.x = std::min(minPos.x, m->position().x);
+            minPos.y = std::min(minPos.y, m->position().y);
+        }
+
+        for (auto const& m : monitors) {
+            const auto XPOS = m->position() - minPos;
+            LOG(Log::DEBUG, "arrangeMonitors: {} xwayland (real layout) [{}, {}]", m->name(), XPOS.x, XPOS.y);
+            m->setXWaylandPosition(XPOS);
+            m->setXWaylandScale(1.F);
+        }
+        return;
+    }
+
+    if (xwaylandRealLayout && !ALL_UNSCALED)
+        LOG(Log::WARN, "arrangeMonitors: xwayland:real_layout ignored, it requires all monitors to use scale 1");
 
     maxXOffsetRight = 0;
     for (auto const& m : monitors) {

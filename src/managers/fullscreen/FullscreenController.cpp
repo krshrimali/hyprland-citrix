@@ -20,7 +20,16 @@
 #include "../../output/Monitor.hpp"
 #include "../../render/Renderer.hpp"
 #include "../../debug/log/Logger.hpp"
+#include "../../config/ConfigValue.hpp"
+#include "../../desktop/state/WindowState.hpp"
+#include "../../desktop/view/window/X11Backend.hpp"
+#include "../../managers/XWaylandManager.hpp"
+#include "../../state/MonitorState.hpp"
+#ifndef NO_XWAYLAND
+#include "../../xwayland/XSurface.hpp"
+#endif
 #include <optional>
+#include <ranges>
 
 using namespace Fullscreen;
 
@@ -212,15 +221,86 @@ bool CFullscreenController::hasFullscreen(const PHLMONITOR monitor, const std::o
     if (!monitor)
         return false;
 
+    if (getSpanningWindow(monitor))
+        return true;
+
     PHLWORKSPACE activeWorkspace = monitor->getCurrentWorkspace();
     if (!activeWorkspace)
         return false;
 
     return hasFullscreen(activeWorkspace) && getFullscreenModes(activeWorkspace).internal == FSMODE_FULLSCREEN;
 }
+
+std::optional<CBox> CFullscreenController::spanBox(const PHLWINDOW window) {
+#ifdef NO_XWAYLAND
+    return std::nullopt;
+#else
+    static auto PFSMONITORS = CConfigValue<Config::INTEGER>("xwayland:fullscreen_monitors");
+    if (!*PFSMONITORS || !window || !window->backend().isX11())
+        return std::nullopt;
+
+    const auto X11 = dynamic_cast<const Desktop::View::CX11Backend*>(&window->backend());
+    if (!X11)
+        return std::nullopt;
+
+    const auto SURF = X11->xwaylandSurface();
+    if (!SURF || !SURF->m_fullscreenMonitorsBox)
+        return std::nullopt;
+
+    const auto XBOX = *SURF->m_fullscreenMonitorsBox;
+    const auto TL   = g_pXWaylandManager->xwaylandToWaylandCoords(XBOX.pos());
+    const auto BR   = g_pXWaylandManager->xwaylandToWaylandCoords(XBOX.pos() + XBOX.size() - Vector2D{1, 1}) + Vector2D{1, 1};
+    const CBox BOX  = {TL, BR - TL};
+
+    if (BOX.w <= 0 || BOX.h <= 0)
+        return std::nullopt;
+
+    const auto COVERED = std::ranges::count_if(State::monitorState()->monitors(), [&BOX](const auto& m) { return !BOX.intersection(m->logicalBox()).empty(); });
+    if (COVERED < 2)
+        return std::nullopt;
+
+    return BOX;
+#endif
+}
+
+CBox CFullscreenController::fullscreenBox(const PHLWINDOW window, const PHLMONITOR monitor) {
+    if (const auto SPAN = spanBox(window); SPAN)
+        return *SPAN;
+
+    return monitor->logicalBox();
+}
+
+PHLWINDOW CFullscreenController::getSpanningWindow(const PHLMONITOR monitor) {
+#ifdef NO_XWAYLAND
+    return nullptr;
+#else
+    static auto PFSMONITORS = CConfigValue<Config::INTEGER>("xwayland:fullscreen_monitors");
+    if (!*PFSMONITORS || !monitor)
+        return nullptr;
+
+    for (auto const& w : Desktop::windowState()->windows() | std::views::reverse) {
+        if (!w->mapped() || w->isHidden() || !w->m_workspace || !w->m_workspace->visible() || w->m_monitor == monitor)
+            continue;
+
+        if (!isFullscreen(w, FSMODE_FULLSCREEN))
+            continue;
+
+        const auto SPAN = spanBox(w);
+        if (!SPAN || SPAN->intersection(monitor->logicalBox()).empty())
+            continue;
+
+        return w;
+    }
+
+    return nullptr;
+#endif
+}
 PHLWINDOW CFullscreenController::getFullscreenWindow(const PHLMONITOR monitor, const std::optional<bool> covering) {
     if (!monitor)
         return nullptr;
+
+    if (const auto SPANNING = getSpanningWindow(monitor); SPANNING)
+        return SPANNING;
 
     PHLWORKSPACE activeWorkspace = monitor->getCurrentWorkspace();
     if (!activeWorkspace)

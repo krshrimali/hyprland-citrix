@@ -3,6 +3,7 @@
 #include "../../helpers/memory/Memory.hpp"
 #include "desktop/DesktopTypes.hpp"
 #include "FullscreenTypes.hpp"
+#include <hyprutils/math/Box.hpp>
 #include <optional>
 
 namespace Fullscreen {
@@ -46,6 +47,17 @@ namespace Fullscreen {
 
         /// @warning Will return the modes of the TOPMOST Covering FS Window if there are several
         SFullscreenMode getFullscreenModes(const PHLMONITOR monitor, const std::optional<bool> covering = true);
+
+        // Multi-monitor span (X11 _NET_WM_FULLSCREEN_MONITORS)
+
+        /// Box (layout coords) a fullscreen window should cover, if it spans more than one monitor.
+        std::optional<Hyprutils::Math::CBox> spanBox(const PHLWINDOW window);
+
+        /// Fullscreen box for a window: its span box, or the given monitor's box.
+        Hyprutils::Math::CBox fullscreenBox(const PHLWINDOW window, const PHLMONITOR monitor);
+
+        /// A visible fullscreen window from another monitor whose span covers this monitor.
+        PHLWINDOW getSpanningWindow(const PHLMONITOR monitor);
 
         // Handler
 

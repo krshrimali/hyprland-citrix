@@ -45,6 +45,8 @@ namespace Desktop::View {
         void                   close() override;
         void                   ping() override;
 
+        SP<CXWaylandSurface>   xwaylandSurface() const;
+
       private:
         void                    attach(PHLWINDOWREF window) override;
         PHLMONITOR              preferredMonitor(PHLMONITOR monitor) const;

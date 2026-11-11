@@ -392,6 +392,7 @@ else()
     xcb-icccm
     xcb-composite
     xcb-res
+    xcb-xinerama
     xcb-errors)
 
   pkg_check_modules(

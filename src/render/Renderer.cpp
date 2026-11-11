@@ -241,6 +241,10 @@ bool IHyprRenderer::shouldRenderWindow(PHLWINDOW pWindow, PHLMONITOR pMonitor) {
     if (pWindow->m_state & WINDOW_STATE_PINNED)
         return true;
 
+    // fullscreen window spanning multiple monitors (_NET_WM_FULLSCREEN_MONITORS)
+    if (pWindow->m_monitor != pMonitor && Fullscreen::controller()->getSpanningWindow(pMonitor) == pWindow)
+        return true;
+
     // if the window is being moved to a workspace that is not invisible, and the alpha is > 0.F, render it.
     if (pWindow->presentation().movingFromMonitor() && pWindow->presentation().alpha(WINDOW_ALPHA_MOVE_TO_WORKSPACE)->isBeingAnimated() &&
         pWindow->presentation().alphaValue(WINDOW_ALPHA_MOVE_TO_WORKSPACE) > 0.F && pWindow->m_workspace && !pWindow->m_workspace->visible())
@@ -1321,6 +1325,12 @@ void IHyprRenderer::renderAllClientsForWorkspace(CRenderContext& ctx, PHLMONITOR
 
         // render the bad boy
         renderWindow(ctx, w, pMonitor, w->presentation().renderPresentation(mode), time, true, RENDER_PASS_ALL);
+    }
+
+    // fullscreen window from another monitor spanning onto this one, above everything on this workspace
+    if (mode == eSceneMode::MONITOR) {
+        if (const auto SPANNING = Fullscreen::controller()->getSpanningWindow(pMonitor); SPANNING)
+            renderWindow(ctx, SPANNING, pMonitor, SPANNING->presentation().renderPresentation(mode), time, true, RENDER_PASS_ALL);
     }
 
     if (mode != eSceneMode::MONITOR)

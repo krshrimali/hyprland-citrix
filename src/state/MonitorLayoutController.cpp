@@ -69,7 +69,8 @@ void CMonitorLayoutController::arrange() const {
     }
 
     LOG(Log::DEBUG, "arrangeMonitors: {} to arrange", arrangeableMonitors.size());
-    State::monitorPositionController()->arrange(arrangeableMonitors, *PXWLFORCESCALEZERO);
+    static auto PXWLREALLAYOUT = CConfigValue<Config::INTEGER>("xwayland:real_layout");
+    State::monitorPositionController()->arrange(arrangeableMonitors, *PXWLFORCESCALEZERO, *PXWLREALLAYOUT);
 
     for (const auto& m : State::monitorState()->monitors()) {
         g_pHyprRenderer->arrangeLayersForMonitor(m->m_id);

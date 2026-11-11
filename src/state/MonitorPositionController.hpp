@@ -9,7 +9,7 @@
 namespace State {
     class CMonitorPositionController {
       public:
-        void arrange(std::span<const SP<Monitor::IMonitorArrangeable>> monitors, bool xwaylandForceZeroScaling) const;
+        void arrange(std::span<const SP<Monitor::IMonitorArrangeable>> monitors, bool xwaylandForceZeroScaling, bool xwaylandRealLayout = false) const;
     };
 
     UP<CMonitorPositionController>& monitorPositionController();

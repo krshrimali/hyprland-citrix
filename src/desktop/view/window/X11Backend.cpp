@@ -393,6 +393,10 @@ void CX11Backend::close() {
         SURFACE->close();
 }
 
+SP<CXWaylandSurface> CX11Backend::xwaylandSurface() const {
+    return m_xwaylandSurface.lock();
+}
+
 void CX11Backend::ping() {
     if (const auto SURFACE = m_xwaylandSurface.lock())
         SURFACE->ping();

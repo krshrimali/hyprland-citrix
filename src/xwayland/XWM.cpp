@@ -11,8 +11,10 @@
 #include <algorithm>
 #include <unordered_map>
 #include <xcb/xcb_icccm.h>
+#include <xcb/xinerama.h>
 
 #include "XWayland.hpp"
+#include "../config/ConfigValue.hpp"
 #include "../Compositor.hpp"
 #include "../protocols/core/Seat.hpp"
 #include "../managers/eventLoop/EventLoopManager.hpp"
@@ -483,6 +485,28 @@ void CXWM::handleClientMessage(xcb_client_message_event_t* e) {
         else if (state == XCB_ICCCM_WM_STATE_NORMAL)
             XSURF->m_state.requestsMinimize = false;
         XSURF->m_events.stateChanged.emit();
+    } else if (e->type == HYPRATOMS["_NET_WM_FULLSCREEN_MONITORS"]) {
+        static auto PFSMONITORS = CConfigValue<Config::INTEGER>("xwayland:fullscreen_monitors");
+        if (!*PFSMONITORS)
+            return;
+
+        // data: top, bottom, left, right xinerama indices, source indication
+        const std::array<uint32_t, 4> INDICES = {e->data.data32[0], e->data.data32[1], e->data.data32[2], e->data.data32[3]};
+        XSURF->m_fullscreenMonitorsBox        = fullscreenMonitorsBox(INDICES);
+
+        // EWMH: the WM sets the property on the window
+        xcb_change_property(getConnection(), XCB_PROP_MODE_REPLACE, XSURF->m_xID, HYPRATOMS["_NET_WM_FULLSCREEN_MONITORS"], XCB_ATOM_CARDINAL, 32, 4, INDICES.data());
+        xcb_flush(getConnection());
+
+        if (XSURF->m_fullscreenMonitorsBox)
+            LOG(Log::DEBUG, "[xwm] surface {:x} requests fullscreen monitors [{} {} {} {}] -> {}x{} at {},{}", rc<uintptr_t>(XSURF.get()), INDICES[0], INDICES[1], INDICES[2],
+                INDICES[3], XSURF->m_fullscreenMonitorsBox->w, XSURF->m_fullscreenMonitorsBox->h, XSURF->m_fullscreenMonitorsBox->x, XSURF->m_fullscreenMonitorsBox->y);
+
+        // re-apply fullscreen so the new span takes effect
+        if (XSURF->m_fullscreen && XSURF->m_mapped) {
+            XSURF->m_state.requestsFullscreen = true;
+            XSURF->m_events.stateChanged.emit();
+        }
     } else if (e->type == HYPRATOMS["_NET_ACTIVE_WINDOW"]) {
         XSURF->m_events.activate.emit();
     } else if (e->type == HYPRATOMS["XdndStatus"]) {
@@ -1066,7 +1090,13 @@ CXWM::CXWM() : m_connection(makeUnique<CXCBConnection>(g_pXWayland->m_server->m_
         HYPRATOMS["_NET_WORKAREA"],
         HYPRATOMS["_NET_WM_STATE_DEMANDS_ATTENTION"],
     };
-    xcb_change_property(getConnection(), XCB_PROP_MODE_REPLACE, m_screen->root, HYPRATOMS["_NET_SUPPORTED"], XCB_ATOM_ATOM, 32, sizeof(supported) / sizeof(*supported), supported);
+    std::vector<xcb_atom_t> supportedAtoms(std::begin(supported), std::end(supported));
+
+    static auto             PFSMONITORS = CConfigValue<Config::INTEGER>("xwayland:fullscreen_monitors");
+    if (*PFSMONITORS)
+        supportedAtoms.push_back(HYPRATOMS["_NET_WM_FULLSCREEN_MONITORS"]);
+
+    xcb_change_property(getConnection(), XCB_PROP_MODE_REPLACE, m_screen->root, HYPRATOMS["_NET_SUPPORTED"], XCB_ATOM_ATOM, 32, supportedAtoms.size(), supportedAtoms.data());
 
     setActiveWindow(XCB_WINDOW_NONE);
     initSelection();
@@ -1745,3 +1775,36 @@ bool SXTransfer::getIncomingSelectionProp(bool erase) {
 }
 
 #endif
+
+std::optional<CBox> CXWM::fullscreenMonitorsBox(const std::array<uint32_t, 4>& indices) {
+    // indices are top, bottom, left, right xinerama screen indices
+    const auto COOKIE = xcb_xinerama_query_screens(getConnection());
+    const auto REPLY  = xcb_xinerama_query_screens_reply(getConnection(), COOKIE, nullptr);
+    if (!REPLY)
+        return std::nullopt;
+
+    const auto SCREENS = xcb_xinerama_query_screens_screen_info(REPLY);
+    const auto COUNT   = sc<uint32_t>(xcb_xinerama_query_screens_screen_info_length(REPLY));
+
+    if (std::ranges::any_of(indices, [COUNT](uint32_t i) { return i >= COUNT; })) {
+        free(REPLY);
+        return std::nullopt;
+    }
+
+    const auto&  TOP    = SCREENS[indices[0]];
+    const auto&  BOTTOM = SCREENS[indices[1]];
+    const auto&  LEFT   = SCREENS[indices[2]];
+    const auto&  RIGHT  = SCREENS[indices[3]];
+
+    const double X1 = LEFT.x_org;
+    const double Y1 = TOP.y_org;
+    const double X2 = sc<double>(RIGHT.x_org) + RIGHT.width;
+    const double Y2 = sc<double>(BOTTOM.y_org) + BOTTOM.height;
+
+    free(REPLY);
+
+    if (X2 <= X1 || Y2 <= Y1)
+        return std::nullopt;
+
+    return CBox{X1, Y1, X2 - X1, Y2 - Y1};
+}
