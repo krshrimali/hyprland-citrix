@@ -3,6 +3,7 @@
 #include "../Compositor.hpp"
 #include "../desktop/state/FocusState.hpp"
 #include "core/Compositor.hpp"
+#include "XWaylandKeyboardGrab.hpp"
 
 CKeyboardShortcutsInhibitor::CKeyboardShortcutsInhibitor(SP<CZwpKeyboardShortcutsInhibitorV1> resource_, SP<CWLSurfaceResource> surf) : m_resource(resource_), m_surface(surf) {
     if UNLIKELY (!m_resource->resource())
@@ -81,6 +82,10 @@ bool CKeyboardShortcutsInhibitProtocol::isInhibited() {
 
         return true;
     }
+
+    // X11 client holding an active keyboard grab (XGrabKeyboard) via Xwayland
+    if (PROTO::xwaylandKeyboardGrab && PROTO::xwaylandKeyboardGrab->isGrabbed(Desktop::focusState()->surface()))
+        return true;
 
     return false;
 }

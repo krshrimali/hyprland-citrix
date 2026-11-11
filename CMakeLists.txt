@@ -581,6 +581,8 @@ protocolnew("staging/ext-foreign-toplevel-list" "ext-foreign-toplevel-list-v1"
 protocolnew("unstable/pointer-gestures" "pointer-gestures-unstable-v1" false)
 protocolnew("unstable/keyboard-shortcuts-inhibit"
             "keyboard-shortcuts-inhibit-unstable-v1" false)
+protocolnew("unstable/xwayland-keyboard-grab"
+            "xwayland-keyboard-grab-unstable-v1" false)
 protocolnew("unstable/text-input" "text-input-unstable-v3" false)
 protocolnew("unstable/pointer-constraints" "pointer-constraints-unstable-v1"
             false)

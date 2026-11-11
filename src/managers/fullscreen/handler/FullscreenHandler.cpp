@@ -290,9 +290,17 @@ void IFullscreenHandler::setNoMembersAboveFullscreen(const std::optional<SP<Layo
         }
     }
 
+    // A fullscreen window spanning several monitors (_NET_WM_FULLSCREEN_MONITORS) also covers their layers
+    std::optional<CBox> spanBox;
+    if (SET) {
+        if (const auto FS = getFullscreen(true); FS && FS->window())
+            spanBox = Fullscreen::controller()->spanBox(FS->window());
+    }
+
     // Hide the top layer window when fullscreening a window
     for (auto const& ls : Desktop::layerState()->layers()) {
-        if (ls->m_monitor != MONITOR)
+        const auto LSMON = ls->m_monitor.lock();
+        if (ls->m_monitor != MONITOR && !(spanBox && LSMON && !spanBox->intersection(LSMON->logicalBox()).empty()))
             continue;
 
         ls->m_flags &= ~Desktop::View::LAYER_FLAG_ABOVE_FULLSCREEN;

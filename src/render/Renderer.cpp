@@ -1344,7 +1344,12 @@ void IHyprRenderer::renderAllClientsForWorkspace(CRenderContext& ctx, PHLMONITOR
     }
 
     // Render surfaces above windows for monitor
+    const bool COVERED_BY_SPAN = Fullscreen::controller()->getSpanningWindow(pMonitor) != nullptr;
     for (auto const& ls : pMonitor->m_layerSurfaceLayers[ZWLR_LAYER_SHELL_V1_LAYER_TOP]) {
+        // a fullscreen window spanning onto this monitor hides top layers, like fullscreen does on its own monitor
+        if (COVERED_BY_SPAN && ls && !(ls->m_flags & Desktop::View::LAYER_FLAG_ABOVE_FULLSCREEN))
+            continue;
+
         renderLayer(ctx, ls.lock(), pMonitor, time, false, false, mode != eSceneMode::MONITOR);
     }
     renderFadeouts(ctx, pMonitor, Desktop::FADEOUT_PLANE_LAYER_TOP, SHELL_WORKSPACE, mode);

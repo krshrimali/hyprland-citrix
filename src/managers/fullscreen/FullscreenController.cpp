@@ -315,6 +315,9 @@ SFullscreenMode CFullscreenController::getFullscreenModes(const PHLMONITOR monit
     if (!monitor)
         return {};
 
+    if (const auto SPANNING = getSpanningWindow(monitor); SPANNING)
+        return getFullscreenModes(SPANNING);
+
     PHLWORKSPACE activeWorkspace = monitor->getCurrentWorkspace();
     if (!activeWorkspace)
         return {};
