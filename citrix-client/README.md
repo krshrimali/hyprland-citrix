@@ -17,3 +17,6 @@
 
 Verify after connecting: `journalctl --since -5min | grep -iE 'hardware decod|software decod|TextTracking|SmallFrame|citrix-hide-nvidia'`.
   Debug: `CITRIX_HIDE_NVIDIA_DEBUG=/path/log` logs every file wfica opens. Do not launch through `timeout`/wrappers: the shim strips itself from LD_PRELOAD for children.
+
+Status (2026-11-12): disabled. Intel decode -> NVIDIA EGL import fails (layer#0); NVDEC decode -> UV plane
+import fails (layer#1), YouTube shows green. Launcher override renamed to citrix-wfica.desktop.disabled.
