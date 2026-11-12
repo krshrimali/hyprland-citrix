@@ -1,7 +1,8 @@
 # Citrix client-side performance helpers
 
 - `hide-nvidia.c`: LD_PRELOAD shim. wfica disables hardware H.264 decode when any NVIDIA GPU is
-  present. This hides only `/sys/class/drm/cardN/device/{uevent,vendor}` of NVIDIA cards from it, so
+  present (it counts PCI devices whose sysfs `class` is 0x030000). The shim reports NVIDIA as 0x030200
+  (3D controller) and the Intel iGPU as 0x030000, and hides NVIDIA's `/sys/class/drm/cardN/device/{uevent,vendor}`, so
   it decodes on the Intel iGPU (VA-API). OpenGL stays on NVIDIA.
   Build: `gcc -O2 -Wall -shared -fPIC -o hide-nvidia.so hide-nvidia.c -ldl`
 - `citrix-wfica`: launcher used by the `citrix-wfica.desktop` override (`citrix-wfica.desktop.in`).
@@ -12,3 +13,4 @@
   `SmallFramesEnabled` = True (backup: `wfclient.ini.bak-perf`).
 
 Verify after connecting: `journalctl --since -5min | grep -iE 'hardware decod|software decod|TextTracking|SmallFrame|citrix-hide-nvidia'`.
+  Debug: `CITRIX_HIDE_NVIDIA_DEBUG=/path/log` logs every file wfica opens. Do not launch through `timeout`/wrappers: the shim strips itself from LD_PRELOAD for children.
