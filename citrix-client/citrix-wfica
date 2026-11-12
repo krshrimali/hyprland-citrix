@@ -1,0 +1,9 @@
+#!/bin/sh
+# Launches Citrix wfica with hide-nvidia.so so it decodes H.264 on the Intel iGPU (VA-API).
+# Set CITRIX_HIDE_NVIDIA=0 to launch without it (stock behaviour).
+export ICAROOT=/opt/Citrix/ICAClient
+SHIM="$HOME/.local/lib/citrix/hide-nvidia.so"
+if [ "${CITRIX_HIDE_NVIDIA:-1}" != 0 ] && [ -f "$SHIM" ]; then
+    export LD_PRELOAD="$SHIM${LD_PRELOAD:+:$LD_PRELOAD}"
+fi
+exec "$ICAROOT/wfica" -file "$1"
