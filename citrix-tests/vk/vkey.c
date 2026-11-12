@@ -1,5 +1,6 @@
 /* press SUPER+T via zwp_virtual_keyboard_v1 */
 #define _GNU_SOURCE
+#include <stdlib.h>
 #include <wayland-client.h>
 #include <xkbcommon/xkbcommon.h>
 #include <string.h>
@@ -16,7 +17,7 @@ static void g(void* d, struct wl_registry* r, uint32_t n, const char* i, uint32_
 static void gr(void* d, struct wl_registry* r, uint32_t n) {}
 static const struct wl_registry_listener rl = {g, gr};
 static uint32_t ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000 + t.tv_nsec / 1000000; }
-int main(void) {
+int main(int argc, char** argv) {
     struct wl_display* dpy = wl_display_connect(NULL); if (!dpy) return 1;
     struct wl_registry* reg = wl_display_get_registry(dpy); wl_registry_add_listener(reg, &rl, NULL); wl_display_roundtrip(dpy);
     if (!seat || !mgr) { fprintf(stderr, "no vk\n"); return 1; }
@@ -28,7 +29,7 @@ int main(void) {
     int fd = memfd_create("km", 0); write(fd, s, len);
     zwp_virtual_keyboard_v1_keymap(kb, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, fd, len);
     wl_display_roundtrip(dpy);
-    const uint32_t SUPER = 125, T = 20; /* evdev codes: KEY_LEFTMETA, KEY_T */
+    const uint32_t SUPER = 125, T = argc > 1 ? (uint32_t)atoi(argv[1]) : 20; /* evdev codes: KEY_LEFTMETA, KEY_T (or argv[1]) */
     zwp_virtual_keyboard_v1_key(kb, ms(), SUPER, 1); zwp_virtual_keyboard_v1_modifiers(kb, 64, 0, 0, 0); wl_display_roundtrip(dpy); usleep(30000);
     zwp_virtual_keyboard_v1_key(kb, ms(), T, 1); wl_display_roundtrip(dpy); usleep(30000);
     zwp_virtual_keyboard_v1_key(kb, ms(), T, 0); wl_display_roundtrip(dpy); usleep(30000);
