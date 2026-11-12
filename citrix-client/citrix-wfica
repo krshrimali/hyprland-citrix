@@ -1,9 +1,24 @@
 #!/bin/sh
-# Launches Citrix wfica with hide-nvidia.so so it decodes H.264 on the Intel iGPU (VA-API).
-# Set CITRIX_HIDE_NVIDIA=0 to launch without it (stock behaviour).
+# Launches Citrix wfica with hide-nvidia.so so it enables hardware H.264 decoding:
+#  - wfica sees the Intel iGPU (not NVIDIA) in its GPU check, so it allows HW decode;
+#  - its VA-API device (first render node = Intel) is redirected to the NVIDIA render node and
+#    decoded by nvidia-vaapi-driver (NVDEC), so frames stay on the GPU that renders (NVIDIA EGL).
+# CITRIX_HIDE_NVIDIA=0: stock behaviour. CITRIX_VAAPI=intel: decode on Intel instead (frames can't be
+# imported by NVIDIA EGL; not recommended).
 export ICAROOT=/opt/Citrix/ICAClient
 SHIM="$HOME/.local/lib/citrix/hide-nvidia.so"
+node_for() { # vendor id -> /dev/dri/renderD*
+    for r in /sys/class/drm/renderD*; do
+        [ "$(cat "$r/device/vendor" 2>/dev/null)" = "$1" ] && { echo "/dev/dri/${r##*/}"; return; }
+    done
+}
 if [ "${CITRIX_HIDE_NVIDIA:-1}" != 0 ] && [ -f "$SHIM" ]; then
     export LD_PRELOAD="$SHIM${LD_PRELOAD:+:$LD_PRELOAD}"
+    NV=$(node_for 0x10de)
+    FIRST=$(ls /dev/dri/renderD* 2>/dev/null | sort -V | head -1)
+    if [ "${CITRIX_VAAPI:-nvidia}" = nvidia ] && [ -n "$NV" ] && [ -f /usr/lib/dri/nvidia_drv_video.so ]; then
+        [ "$FIRST" != "$NV" ] && export CITRIX_VAAPI_FROM="$FIRST" CITRIX_VAAPI_TO="$NV"
+        export LIBVA_DRIVER_NAME=nvidia NVD_BACKEND=direct
+    fi
 fi
 exec "$ICAROOT/wfica" -file "$1"

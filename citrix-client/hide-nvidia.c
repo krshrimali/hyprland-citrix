@@ -8,7 +8,10 @@
  * and 0x030000 for Intel, and hides /sys/class/drm/cardN/device/{uevent,vendor} of NVIDIA cards.
  * wfica then sees one Intel GPU, keeps OpenGL (still rendered on NVIDIA via EGL; /dev/nvidia*,
  * PCI config space and libdrm's /sys/dev/char paths are untouched) and decodes via VA-API on Intel.
- * CITRIX_HIDE_NVIDIA_DEBUG=<file> logs every /sys open to that file.
+ * CITRIX_HIDE_NVIDIA_DEBUG=<file> logs every opened path to that file.
+ * CITRIX_VAAPI_FROM=/dev/dri/renderD128 CITRIX_VAAPI_TO=/dev/dri/renderD129: wfica's ffmpeg VA-API picks
+ * the first render node (Intel); NVIDIA EGL can't import Intel's tiled surfaces, so redirect that node
+ * to NVIDIA's (use with LIBVA_DRIVER_NAME=nvidia, nvidia-vaapi-driver) to decode where we render.
  *
  * Disable with CITRIX_HIDE_NVIDIA=0. Removes itself from LD_PRELOAD so child processes don't inherit it.
  */
@@ -25,6 +28,7 @@
 #include <sys/mman.h>
 
 static int enabled = 1;
+static const char *vaFrom, *vaTo;
 static const char* debug; /* log path; reopened per line because wfica closes inherited fds */
 
 __attribute__((constructor)) static void init(void) {
@@ -34,6 +38,10 @@ __attribute__((constructor)) static void init(void) {
     const char* d = getenv("CITRIX_HIDE_NVIDIA_DEBUG");
     if (d && *d)
         debug = d;
+    vaFrom = getenv("CITRIX_VAAPI_FROM");
+    vaTo   = getenv("CITRIX_VAAPI_TO");
+    if (!vaFrom || !vaTo || !*vaFrom || !*vaTo)
+        vaFrom = vaTo = NULL;
     /* drop ourselves from LD_PRELOAD for children */
     const char* lp = getenv("LD_PRELOAD");
     if (lp && strstr(lp, "hide-nvidia")) {
@@ -132,15 +140,25 @@ static int fakefd(const char* content) {
     return fd;
 }
 
+static const char* redirect(const char* p) {
+    if (vaFrom && p && !strcmp(p, vaFrom)) {
+        static int logged;
+        if (!logged++)
+            fprintf(stderr, "citrix-hide-nvidia: VA-API device %s -> %s\n", vaFrom, vaTo);
+        return vaTo;
+    }
+    return p;
+}
+
 #define REAL(name) static __typeof__(name)* real_##name; if (!real_##name) real_##name = dlsym(RTLD_NEXT, #name)
 
 FILE* fopen(const char* p, const char* m) { REAL(fopen); if (hidden(p)) { errno = ENOENT; return NULL; } const char* f = faked(p); if (f) { int fd = fakefd(f); if (fd >= 0) return fdopen(fd, "r"); } return real_fopen(p, m); }
 FILE* fopen64(const char* p, const char* m) { REAL(fopen64); if (hidden(p)) { errno = ENOENT; return NULL; } const char* f = faked(p); if (f) { int fd = fakefd(f); if (fd >= 0) return fdopen(fd, "r"); } return real_fopen64(p, m); }
 
 #define OPEN_MODE(flags) mode_t mode = 0; if ((flags) & (O_CREAT | O_TMPFILE)) { va_list ap; va_start(ap, flags); mode = va_arg(ap, mode_t); va_end(ap); }
-int open(const char* p, int f, ...) { REAL(open); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_open(p, f, mode); }
-int open64(const char* p, int f, ...) { REAL(open64); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_open64(p, f, mode); }
-int openat(int d, const char* p, int f, ...) { REAL(openat); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_openat(d, p, f, mode); }
-int openat64(int d, const char* p, int f, ...) { REAL(openat64); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_openat64(d, p, f, mode); }
-int __open_2(const char* p, int f) { if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } REAL(__open_2); return real___open_2(p, f); }
-int __open64_2(const char* p, int f) { if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } REAL(__open64_2); return real___open64_2(p, f); }
+int open(const char* p, int f, ...) { REAL(open); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_open(redirect(p), f, mode); }
+int open64(const char* p, int f, ...) { REAL(open64); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_open64(redirect(p), f, mode); }
+int openat(int d, const char* p, int f, ...) { REAL(openat); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_openat(d, redirect(p), f, mode); }
+int openat64(int d, const char* p, int f, ...) { REAL(openat64); OPEN_MODE(f); if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } return real_openat64(d, redirect(p), f, mode); }
+int __open_2(const char* p, int f) { if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } REAL(__open_2); return real___open_2(redirect(p), f); }
+int __open64_2(const char* p, int f) { if (hidden(p)) { errno = ENOENT; return -1; } { const char* fk = faked(p); if (fk) { int fd = fakefd(fk); if (fd >= 0) return fd; } } REAL(__open64_2); return real___open64_2(redirect(p), f); }
