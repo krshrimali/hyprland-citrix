@@ -54,13 +54,6 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
 
     const auto  isShadowedByModal = [](PHLWINDOW w) -> bool { return *PMODALPARENTBLOCKING && !w->backend().isX11() && w->backend().traits().hasModalChild; };
 
-    // fullscreen window spanning onto this monitor from another one covers everything here
-    if (!workspace && !ONLY_PRIORITY && !(properties & SKIP_FULLSCREEN_PRIORITY)) {
-        const auto SPANNING = Fullscreen::controller()->getSpanningWindow(PMONITOR);
-        if (SPANNING && SPANNING != ignoreWindow && SPANNING->getWindowBoxUnified(properties).containsPoint(pos))
-            return SPANNING;
-    }
-
     // pinned windows on top of floating regardless
     if (properties & ALLOW_FLOATING) {
         for (auto const& w : WINDOWS | std::views::reverse) {
@@ -82,6 +75,13 @@ PHLWINDOW CViewHitTester::windowAtInternal(const Vector2D& pos, uint16_t propert
                 }
             }
         }
+    }
+
+    // fullscreen window spanning onto this monitor from another one covers everything here except pinned windows
+    if (!workspace && !ONLY_PRIORITY && !(properties & SKIP_FULLSCREEN_PRIORITY)) {
+        const auto SPANNING = Fullscreen::controller()->getSpanningWindow(PMONITOR);
+        if (SPANNING && SPANNING != ignoreWindow && SPANNING->getWindowBoxUnified(properties).containsPoint(pos))
+            return SPANNING;
     }
 
     auto windowForWorkspace = [&](bool special) -> PHLWINDOW {

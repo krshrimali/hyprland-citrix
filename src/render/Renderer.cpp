@@ -1312,6 +1312,13 @@ void IHyprRenderer::renderAllClientsForWorkspace(CRenderContext& ctx, PHLMONITOR
         }
     }
 
+    // fullscreen window from another monitor spanning onto this one, above everything on this
+    // workspace except pinned windows (e.g. picture-in-picture), which stay on top like on its own monitor
+    if (mode == eSceneMode::MONITOR) {
+        if (const auto SPANNING = Fullscreen::controller()->getSpanningWindow(pMonitor); SPANNING)
+            renderWindow(ctx, SPANNING, pMonitor, SPANNING->presentation().renderPresentation(mode), time, true, RENDER_PASS_ALL);
+    }
+
     // pinned always above
     for (auto const& w : Desktop::windowState()->windows()) {
         if (w->isHidden() && !w->mapped())
@@ -1325,12 +1332,6 @@ void IHyprRenderer::renderAllClientsForWorkspace(CRenderContext& ctx, PHLMONITOR
 
         // render the bad boy
         renderWindow(ctx, w, pMonitor, w->presentation().renderPresentation(mode), time, true, RENDER_PASS_ALL);
-    }
-
-    // fullscreen window from another monitor spanning onto this one, above everything on this workspace
-    if (mode == eSceneMode::MONITOR) {
-        if (const auto SPANNING = Fullscreen::controller()->getSpanningWindow(pMonitor); SPANNING)
-            renderWindow(ctx, SPANNING, pMonitor, SPANNING->presentation().renderPresentation(mode), time, true, RENDER_PASS_ALL);
     }
 
     if (mode != eSceneMode::MONITOR)

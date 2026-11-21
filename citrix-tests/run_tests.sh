@@ -31,6 +31,18 @@ ok "$(grep -q 'final 5080x2560+0+0' $T/span.out && echo 1)" "P1 span window geom
 for m in A B C; do set -- $(band $m); ok "$([ "$2" -ge 90 ] && echo 1)" "P3 span drawn above panel on $m (red=$2%)"; done
 for p in "200 100" "2700 600" "4500 400"; do set -- $p; H eval "hl.dispatch(hl.dsp.cursor.move({x=$1, y=$2}))" >/dev/null; sleep 0.4
   t=$(H activewindow -j | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("title"))'); ok "$([ "$t" = spanclient ] && echo 1)" "P3 pointer over panel area ($1,$2) focuses span window ($t)"; done
+# pinned floating window (picture-in-picture) stays above a span on a covered monitor
+(WAYLAND_DISPLAY=wayland-2 timeout 20 kitty --class pinpip -o background=#00ff00 -o cursor_blink_interval=0 -e sleep 20 >/dev/null 2>&1 &); sleep 2.5
+H eval 'local w for _,x in ipairs(hl.get_windows()) do if x.class=="pinpip" then w=x end end hl.dispatch(hl.dsp.window.fullscreen({mode="maximized", action="unset", window=w})) hl.dispatch(hl.dsp.window.float({action="enable", window=w})) hl.dispatch(hl.dsp.window.resize({x=600, y=500, window=w})) hl.dispatch(hl.dsp.window.move({x=100, y=1000, window=w})) hl.dispatch(hl.dsp.window.pin({action="enable", window=w}))' >/dev/null; sleep 1
+G=$(WAYLAND_DISPLAY=wayland-2 grim -o A -t ppm $T/pin_A.ppm && python3 -I -c "
+import sys
+d=open(sys.argv[1],'rb').read(); p=d.split(b'\n',3); w,h=map(int,p[1].split()); px=p[3]
+pts=[(x,y) for y in range(1100,1450,10) for x in range(150,650,20)]
+print(100*sum(1 for x,y in pts if px[3*(y*w+x)+1]>200 and px[3*(y*w+x)]<50)//len(pts))" $T/pin_A.ppm)
+ok "$([ "$G" -ge 90 ] && echo 1)" "pinned window drawn above span on A (green=$G%)"
+H eval 'hl.dispatch(hl.dsp.cursor.move({x=400, y=1250}))' >/dev/null; sleep 0.4
+t=$(H activewindow -j | python3 -I -c 'import json,sys;print(json.load(sys.stdin).get("class"))'); ok "$([ "$t" = pinpip ] && echo 1)" "pointer over pinned window above span focuses it ($t)"
+pkill -f "class pinpip"
 pkill -f "$T/spanclient"; sleep 2
 for m in A C; do set -- $(band $m); ok "$([ "$1" -ge 90 ] && echo 1)" "panel restored on $m after span ends (blue=$1%)"; done
 # extend while already fullscreen on one monitor (toolbar "extend to all displays")
